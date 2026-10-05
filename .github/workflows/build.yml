@@ -1,0 +1,134 @@
+name: Build APK
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Create project
+        run: |
+          mkdir app && cd app && mkdir www
+          cat > package.json <<'EOF'
+          {"name":"app","version":"1.0.0","private":true,"dependencies":{"@capacitor/android":"^6.1.0","@capacitor/core":"^6.1.0","@capacitor/filesystem":"^6.0.0","@capacitor/share":"^6.0.0","jspdf":"^2.5.1"},"devDependencies":{"@capacitor/cli":"^6.1.0"}}
+          EOF
+          cat > capacitor.config.json <<'EOF'
+          {"appId":"com.alaa.pdfimages","appName":"Image to PDF","webDir":"www"}
+          EOF
+          cat > www/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="ar" dir="rtl">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+          <title>&#x635;&#x648;&#x631; &#x625;&#x644;&#x649; PDF</title>
+          <script src="jspdf.umd.min.js"></script>
+          <style>
+          :root{--bg:#f6f7f9;--card:#fff;--tx:#161a1f;--mut:#6b7280;--ac:#1a73e8;--bd:#e3e6ea}
+          @media (prefers-color-scheme:dark){:root{--bg:#0f1114;--card:#1a1d22;--tx:#eef0f3;--mut:#9aa1ab;--ac:#5b9dff;--bd:#2b3038}}
+          *{box-sizing:border-box}
+          body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,sans-serif;padding-top:env(safe-area-inset-top,0px)}
+          main{max-width:520px;margin:0 auto;padding:20px 16px 40px}
+          h1{font-size:22px;margin:8px 0 16px;text-align:center}
+          .pick{display:block;border:2px dashed var(--ac);border-radius:16px;padding:28px 12px;text-align:center;color:var(--ac);font-weight:700;background:var(--card)}
+          input[type=file]{display:none}
+          .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0}
+          .it{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;border:1px solid var(--bd)}
+          .it img{width:100%;height:100%;object-fit:cover}
+          .it button{position:absolute;top:4px;left:4px;width:26px;height:26px;border:0;border-radius:50%;background:rgba(0,0,0,.65);color:#fff;font-size:16px}
+          .n{position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,.65);color:#fff;border-radius:8px;font-size:12px;padding:1px 7px}
+          .go{width:100%;padding:16px;border:0;border-radius:14px;background:var(--ac);color:#fff;font-size:18px;font-weight:700}
+          .go:disabled{opacity:.45}
+          .row{display:flex;gap:8px;margin-bottom:10px}
+          .row button{flex:1;padding:11px;border-radius:12px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font-size:15px}
+          .row button.on{border-color:var(--ac);color:var(--ac);font-weight:700}
+          #msg{text-align:center;color:var(--mut);margin-top:12px;min-height:22px;font-size:14px}
+          </style>
+          </head>
+          <body>
+          <main>
+          <h1>&#x1F4C4; &#x635;&#x648;&#x631; &#x625;&#x644;&#x649; PDF</h1>
+          <label class="pick"><input id="f" type="file" accept="image/*" multiple>+ &#x627;&#x62E;&#x62A;&#x631; &#x627;&#x644;&#x635;&#x648;&#x631;</label>
+          <div class="grid" id="g"></div>
+          <div class="row" id="opt" hidden>
+          <button data-m="a4" class="on">&#x62D;&#x62C;&#x645; A4</button>
+          <button data-m="orig">&#x62D;&#x62C;&#x645; &#x627;&#x644;&#x635;&#x648;&#x631;&#x629;</button>
+          </div>
+          <button class="go" id="go" disabled>&#x62D;&#x648;&#x651;&#x644; &#x625;&#x644;&#x649; PDF</button>
+          <div id="msg"></div>
+          </main>
+          <script>
+          let files=[],mode="a4";
+          const $=s=>document.querySelector(s),msg=t=>$("#msg").textContent=t;
+          $("#f").onchange=e=>{files.push(...e.target.files);e.target.value="";draw()};
+          document.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{mode=b.dataset.m;document.querySelectorAll("[data-m]").forEach(x=>x.classList.toggle("on",x===b))});
+          function draw(){
+          const g=$("#g");g.innerHTML="";
+          files.forEach((f,i)=>{
+          const d=document.createElement("div");d.className="it";
+          const im=new Image();im.src=URL.createObjectURL(f);
+          const x=document.createElement("button");x.textContent="\u00D7";x.onclick=()=>{files.splice(i,1);draw()};
+          const n=document.createElement("span");n.className="n";n.textContent=i+1;
+          d.append(im,x,n);g.append(d);
+          });
+          $("#go").disabled=!files.length;$("#opt").hidden=!files.length;msg("");
+          }
+          function load(f){return new Promise((ok,no)=>{
+          const u=URL.createObjectURL(f),im=new Image();
+          im.onload=()=>{const c=document.createElement("canvas");c.width=im.naturalWidth;c.height=im.naturalHeight;
+          const x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0);
+          URL.revokeObjectURL(u);ok({d:c.toDataURL("image/jpeg",.92),w:c.width,h:c.height})};
+          im.onerror=()=>no(new Error("\u062A\u0639\u0630\u0631 \u0642\u0631\u0627\u0621\u0629: "+f.name));im.src=u})}
+          async function saveFile(pdf,name){
+          const P=window.Capacitor&&window.Capacitor.Plugins;
+          if(P&&P.Filesystem&&P.Share){
+          const data=pdf.output("datauristring").split(",").pop();
+          const r=await P.Filesystem.writeFile({path:name,data,directory:"CACHE"});
+          await P.Share.share({title:name,url:r.uri,dialogTitle:"\u062D\u0641\u0638 \u0623\u0648 \u0645\u0634\u0627\u0631\u0643\u0629 PDF"});
+          }else pdf.save(name);
+          }
+          $("#go").onclick=async()=>{
+          const btn=$("#go");btn.disabled=true;
+          try{
+          const {jsPDF}=window.jspdf;let pdf;
+          for(let i=0;i<files.length;i++){
+          msg(`\u062C\u0627\u0631\u064A \u0627\u0644\u0645\u0639\u0627\u0644\u062C\u0629 ${i+1}/${files.length}`);
+          const o=await load(files[i]);
+          let pw,ph;
+          if(mode==="a4"){pw=595.28;ph=841.89;if(o.w>o.h){[pw,ph]=[ph,pw]}}
+          else{pw=o.w*.75;ph=o.h*.75}
+          const orient=pw>ph?"l":"p";
+          if(!pdf)pdf=new jsPDF({unit:"pt",format:[pw,ph],orientation:orient,compress:true});else pdf.addPage([pw,ph],orient);
+          const m=mode==="a4"?20:0,s=Math.min((pw-2*m)/o.w,(ph-2*m)/o.h),w=o.w*s,h=o.h*s;
+          pdf.addImage(o.d,"JPEG",(pw-w)/2,(ph-h)/2,w,h);
+          await new Promise(r=>setTimeout(r));
+          }
+          await saveFile(pdf,"images-"+Date.now()+".pdf");msg("\u062A\u0645 \u2705");
+          }catch(e){msg("\u0635\u0627\u0631 \u062E\u0637\u0623: "+(e.message||e))}
+          btn.disabled=!files.length;
+          };
+          </script>
+          </body>
+          </html>
+          EOF
+      - name: Build
+        run: |
+          cd app
+          npm install
+          cp node_modules/jspdf/dist/jspdf.umd.min.js www/
+          npx cap add android
+          npx cap sync android
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PDF-APK
+          path: app/android/app/build/outputs/apk/debug/app-debug.apk
